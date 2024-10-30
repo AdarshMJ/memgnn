@@ -3,28 +3,40 @@ warnings.filterwarnings('ignore')
 import argparse
 import sys
 import os
+from tqdm import tqdm
 import numpy as np
-import random
 import time
 import csv
 from model import *
+from trainmem import *
 from dataloader import *
-from baselinetrain import *
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Run NodeClassification+Rewiring script')
+    parser.add_argument('--dataset', type=str, help='Dataset to download')
+    parser.add_argument('--num_layers', type=int, default=1, help='Number of layers in GCN')
+    parser.add_argument('--model', type=str, default='SimpleGCN', choices=['GCN', 'GATv2','SimpleGCN','SGC','MLP'], help='Model to use')
+    parser.add_argument('--lr', type=float, default=0.01, help='Learning Rate = [0.01,0.001]')
+    parser.add_argument('--out', type=str, help='name of log file')
+    parser.add_argument('--dropout', type=float, default=0.0, help='Dropout = [Cora - 0.4130296, Citeseer - 0.3130296]')
+    parser.add_argument('--hidden_dimension', type=int, default=32, help='Hidden Dimension size')
+    parser.add_argument('--device',type=str,default='cuda',help='Device to use')
+    parser.add_argument('--num_train',type=int,default='20',help='Number of training nodes per class')
+    parser.add_argument('--num_val',type=int,default='500',help='Number of validation nodes')
+    parser.add_argument('--num_epochs',type=int,default='100',help='Number of training epochs')
+    #parser.add_argument('--percentile',type=int,default='None',help='Number of nodes to drop')
+    parser.add_argument('--percentile', type=str, default=None)
+    args = parser.parse_args()
+    
+    # Convert string 'None' to actual None
+    if args.percentile == 'None':
+        args.percentile = None
+    else:
+        args.percentile = float(args.percentile)
+    
+    return args
 
-parser = argparse.ArgumentParser(description='Run NodeClassification+Rewiring script')
-parser.add_argument('--dataset', type=str, help='Dataset to download')
-parser.add_argument('--num_layers', type=int, default=1, help='Number of layers in GCN')
-parser.add_argument('--model', type=str, default='SimpleGCN', choices=['GCN', 'GATv2','SimpleGCN','SGC','MLP'], help='Model to use')
-parser.add_argument('--lr', type=float, default=0.01, help='Learning Rate = [0.01,0.001]')
-parser.add_argument('--out', type=str, help='name of log file')
-parser.add_argument('--dropout', type=float, default=0.0, help='Dropout = [Cora - 0.4130296, Citeseer - 0.3130296]')
-parser.add_argument('--hidden_dimension', type=int, default=32, help='Hidden Dimension size')
-parser.add_argument('--device',type=str,default='cuda',help='Device to use')
-parser.add_argument('--num_train',type=int,default='20',help='Number of training nodes per class')
-parser.add_argument('--num_val',type=int,default='500',help='Number of validation nodes')
-parser.add_argument('--num_epochs',type=int,default='100',help='Number of training epochs')
-args = parser.parse_args()
+args = parse_args()
 
 
 
@@ -33,6 +45,7 @@ filename = args.out
 p = args.dropout
 hidden_dimension = args.hidden_dimension
 lr = args.lr
+
 
 
 
@@ -137,14 +150,17 @@ def create_model(model, num_features, num_classes, hidden_dimension):
 
 
 model = create_model(args.model, num_features, num_classes, args.hidden_dimension).to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=0.0)
+optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=5e-4)
+#optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, weight_decay=0.0)
 model = model.to(device)
 print(model)
 
 
+
 gcn_start = time.time()
 #finaltestaccafter,finalvalaccafter = train_and_get_results(data, model,optimizer,p)
-finaltestaccafter,finalvalaccafter,finaltrainacc = train_and_get_results(data, model, optimizer,args.num_epochs)
+finaltestaccafter,finalvalaccafter,finaltrainaccafter   = train_and_get_results(data, model, optimizer, args.num_epochs,percentile=args.percentile,k_nodes=None,dynamic_zeroing=False)
+#finaltestaccafter,finalvalaccafter,finaltrainaccafter  = train_and_get_results(data, model, optimizer,args.num_epochs,percentile=args.percentile, k_nodes=5,dynamic_zeroing=True,random_baseline=False)
 gcn_end = time.time()
 
 
@@ -156,16 +172,14 @@ avg_val_acc_after = np.mean(finalvalaccafter)
 sample_size = len(finalvalaccafter)
 std_devval_after = 2 * np.std(finalvalaccafter)/(np.sqrt(sample_size))
 
-avg_train_acc_after = np.mean(finaltrainacc)
-sample_size = len(finaltrainacc)
-std_devtrain_after = 2 * np.std(finaltrainacc)/(np.sqrt(sample_size))
+avg_train_acc_after = np.mean(finaltrainaccafter)
+sample_size = len(finaltrainaccafter)
+std_devtrain_after = 2 * np.std(finaltrainaccafter)/(np.sqrt(sample_size))
 
+#print(f'Final val accuracy  {(avg_val_acc_after):.4f}\u00B1{(std_devval_after):.4f}')
+#print(f'Final test accuracy {(avg_test_acc_after):.4f}\u00B1{(std_dev_after):.4f}')
 
-
-#print(f'Final val accuracy after {(avg_val_acc_after):.4f}\u00B1{(std_devval_after):.4f}')
-#print(f'Final test accuracy after {(avg_test_acc_after):.4f}\u00B1{(std_dev_after):.4f}')
-
-headers = ['Method','Model','Dataset','AvgTrainAcc','DevTrain','AvgTestAccAfter','DeviationAfter',
+headers = ['Method','Model','Dataset','AvgTrainAcc','TrainDeviation','AvgTestAccAfter','DeviationAfter',
         'HiddenDim','LR','Dropout','TrainNodes','TestNodes','ValNodes','GCNTime']
 
 with open(filename, mode='a', newline='') as file:
@@ -173,5 +187,5 @@ with open(filename, mode='a', newline='') as file:
     
     if file.tell() == 0:
         writer.writerow(headers)
-    writer.writerow(['Baseline',args.model, args.dataset,f"{(avg_train_acc_after):.4f}", f"{(std_devtrain_after):.4f}", f"{(avg_test_acc_after):.4f}", f"{(std_dev_after):.4f}",
+    writer.writerow([f'NodeDrop_{args.percentile}',args.model, args.dataset,f"{(avg_train_acc_after):.4f}", f"{(std_devtrain_after):.4f}", f"{(avg_test_acc_after):.4f}", f"{(std_dev_after):.4f}",
                      hidden_dimension, lr, p, num_train_nodes/100,num_test_nodes/100,num_val_nodes/100, gcn_end - gcn_start])

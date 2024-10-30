@@ -48,8 +48,8 @@ def load_data(datasetname,num_train_per_class=20,num_val=500):
             data = transform(dataset[0])
             print()
             print("Splitting datasets train/val/test...")
-            transform2 = RandomNodeSplit(split="test_rest", num_splits=100, num_train_per_class=num_train_per_class, num_val=num_val)
-            #transform2 = RandomNodeSplit(split="train_rest", num_splits=100, num_test=num_train_per_class, num_val=num_val)
+            #transform2 = RandomNodeSplit(split="test_rest", num_splits=100, num_train_per_class=num_train_per_class, num_val=num_val)
+            transform2 = RandomNodeSplit(split="train_rest", num_splits=100)
             data = transform2(data)
             #data.train_mask = data.train_mask | data.val_mask
             #data.val_mask = torch.zeros_like(data.val_mask) 
