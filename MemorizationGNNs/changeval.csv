@@ -1,2 +1,0 @@
-Model,Dataset,AvgTestAccAfter,DeviationAfter,HiddenDim,LR,Dropout,TrainNodes,TestNodes,ValNodes,GCNTime
-SimpleGCN,Cora,82.2289,0.0000,512,0.001,0.0,140.0,1845.0,500.0,190.37090134620667
