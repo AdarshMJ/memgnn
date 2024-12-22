@@ -13,6 +13,8 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
 
 def get_save_dir(dataset_name, num_epochs, num_layers, model_name, seed):
     base_dir = Path(f'results/{dataset_name}/{model_name}_{num_layers}layers_{num_epochs}epochs')
@@ -117,75 +119,61 @@ def visualize_prediction_depth_graphs(df, save_dir, set_name, model):
     # Calculate accuracies by depth
     depth_groups = df.groupby('prediction_depth')
     gnn_acc = depth_groups['gnn_correct'].mean()
-    
-    # Fix KNN accuracy calculation - now handling lists directly
     knn_acc = depth_groups.apply(lambda x: np.mean([np.mean(hist) for hist in x['knn_correct_history']]))
-    
     counts = depth_groups.size()
     
-    # Get layer names
-    num_layers = len(model.layers)
-    layer_names = [f"Layer {i+1}" for i in range(num_layers)]
+    # Get actual layer names from the model
+    layer_names = [layer.__class__.__name__ for layer in model.layers]
+    positions = np.arange(len(layer_names))
+    
+    # Ensure data arrays align with positions
+    counts_array = np.zeros(len(positions))
+    gnn_acc_array = np.zeros(len(positions))
+    knn_acc_array = np.zeros(len(positions))
+    
+    for depth in range(len(positions)):
+        if depth in counts.index:
+            counts_array[depth] = counts[depth]
+            gnn_acc_array[depth] = gnn_acc[depth]
+            knn_acc_array[depth] = knn_acc[depth]
+    
+    # Increase default font sizes
+    plt.rcParams.update({'font.size': 14})
     
     # Create plot
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
     
     # GNN Accuracy plot
-    ax1.bar(range(len(counts)), counts, alpha=0.3, color='blue')
+    ax1.bar(positions, counts_array, alpha=0.3, color='blue')
     ax1_twin = ax1.twinx()
-    ax1_twin.plot(range(len(gnn_acc)), gnn_acc * 100, 'r-o')
+    ax1_twin.plot(positions, gnn_acc_array * 100, 'r-o')
     
-    # Set x-axis ticks and labels
-    ax1.set_xticks(range(len(layer_names)))
-    ax1.set_xticklabels(layer_names, rotation=45, ha='right')
+    # Set x-axis ticks and labels for GNN plot
+    ax1.set_xticks(positions)
+    ax1.set_xticklabels(layer_names, rotation=45, ha='right', fontsize=12)
     
-    ax1.set_title(f'GNN Accuracy vs Depth ({set_name} Set)')
-    ax1.set_xlabel('Layer')
-    ax1.set_ylabel('Number of Graphs', color='blue')
-    ax1_twin.set_ylabel('Accuracy (%)', color='red')
-    ax1_twin.set_ylim(-5, 105)
-    ax1_twin.grid(True, alpha=0.3)
-    
-    # Add legend
-    ax1.legend(['Number of Graphs'], loc='upper left')
-    ax1_twin.legend(['GNN Accuracy'], loc='upper right')
+    ax1.set_title(f'GNN Accuracy vs Depth ({set_name} Set)', fontsize=16)
+    ax1.set_xlabel('Layer Type', fontsize=14)
+    ax1.set_ylabel('Number of Graphs', color='blue', fontsize=14)
+    ax1_twin.set_ylabel('Accuracy (%)', color='red', fontsize=14)
     
     # KNN Accuracy plot
-    ax2.bar(range(len(counts)), counts, alpha=0.3, color='blue')
+    ax2.bar(positions, counts_array, alpha=0.3, color='blue')
     ax2_twin = ax2.twinx()
-    ax2_twin.plot(range(len(knn_acc)), knn_acc * 100, 'r-o')
+    ax2_twin.plot(positions, knn_acc_array * 100, 'g-o')
     
-    # Set x-axis ticks and labels
-    ax2.set_xticks(range(len(layer_names)))
-    ax2.set_xticklabels(layer_names, rotation=45, ha='right')
+    # Set x-axis ticks and labels for KNN plot
+    ax2.set_xticks(positions)
+    ax2.set_xticklabels(layer_names, rotation=45, ha='right', fontsize=12)
     
-    ax2.set_title(f'KNN Probe Accuracy vs Depth ({set_name} Set)')
-    ax2.set_xlabel('Layer')
-    ax2.set_ylabel('Number of Graphs', color='blue')
-    ax2_twin.set_ylabel('Accuracy (%)', color='red')
-    ax2_twin.set_ylim(-5, 105)
-    ax2_twin.grid(True, alpha=0.3)
-    
-    # Add legend
-    ax2.legend(['Number of Graphs'], loc='upper left')
-    ax2_twin.legend(['KNN Accuracy'], loc='upper right')
+    ax2.set_title(f'KNN Probe Accuracy vs Depth ({set_name} Set)', fontsize=16)
+    ax2.set_xlabel('Layer Type', fontsize=14)
+    ax2.set_ylabel('Number of Graphs', color='blue', fontsize=14)
+    ax2_twin.set_ylabel('Accuracy (%)', color='green', fontsize=14)
     
     plt.tight_layout()
-    plt.savefig(save_dir / f'accuracy_vs_depth_{set_name}_{timestamp}.png',
-                bbox_inches='tight', dpi=300)
+    plt.savefig(save_dir / f'depth_analysis_{set_name}_{timestamp}.png', bbox_inches='tight', dpi=300)
     plt.close()
-    
-    # Print summary statistics
-    print(f"\nSummary Statistics for {set_name} Set:")
-    print("Number of graphs at each depth:")
-    for depth, count in counts.items():
-        print(f"Layer {depth+1}: {count} graphs")
-    print("\nAccuracies at each depth:")
-    for depth in range(len(layer_names)):
-        if depth in gnn_acc.index:
-            print(f"Layer {depth+1}:")
-            print(f"  GNN Accuracy: {float(gnn_acc[depth])*100:.2f}%")
-            print(f"  KNN Accuracy: {float(knn_acc[depth])*100:.2f}%")
 
 def train_and_get_results(train_loader, val_loader, test_loader, model, optimizer, 
                          num_epochs, dataset_name, num_layers, seed):
@@ -335,9 +323,13 @@ def plot_training_metrics(metrics, save_dir):
     
     # Similar changes for loss plot...
 
-def create_aggregate_depth_analysis(all_depth_distributions, save_dir):
+def create_aggregate_depth_analysis(all_depth_distributions, save_dir, model):
     """Create aggregate analysis of prediction depth across all seeds with error bars."""
     timestamp = time.strftime("%Y%m%d_%H%M%S")
+    
+    # Get actual layer names based on model structure
+    layer_names = [f'GraphConv_{i}' for i in range(len(model.layers))]
+    positions = np.arange(len(layer_names))
     
     # Separate train and test results
     train_results = []
@@ -349,90 +341,106 @@ def create_aggregate_depth_analysis(all_depth_distributions, save_dir):
         else:
             test_results.append(df)
     
-    def plot_aggregate_depth_metrics(results, set_name):
+    # Calculate metrics for both train and test sets
+    def get_metrics(results):
         depth_metrics = []
-        
         for df in results:
             depth_groups = df.groupby('prediction_depth')
             gnn_acc = depth_groups['gnn_correct'].mean()
             knn_acc = depth_groups.apply(lambda x: np.mean([np.mean(hist) for hist in x['knn_correct_history']]))
             counts = depth_groups.size()
-            depth_metrics.append({'gnn_acc': gnn_acc, 'knn_acc': knn_acc, 'counts': counts})
-        
-        max_depth = max(max(m['gnn_acc'].index) for m in depth_metrics)
-        depths = range(max_depth + 1)
-        
-        # Calculate means
-        gnn_means = np.array([np.mean([m['gnn_acc'].get(d, 0) for m in depth_metrics]) for d in depths])
-        knn_means = np.array([np.mean([m['knn_acc'].get(d, 0) for m in depth_metrics]) for d in depths])
-        count_means = np.array([np.mean([m['counts'].get(d, 0) for m in depth_metrics]) for d in depths])
-        
-        # Calculate standard errors
-        n_seeds = len(results)
-        gnn_stderrs = np.array([np.std([m['gnn_acc'].get(d, 0) for m in depth_metrics]) / np.sqrt(n_seeds) for d in depths])
-        knn_stderrs = np.array([np.std([m['knn_acc'].get(d, 0) for m in depth_metrics]) / np.sqrt(n_seeds) for d in depths])
-        
-        # Calculate 95% CI
-        gnn_ci = 1.96 * gnn_stderrs
-        knn_ci = 1.96 * knn_stderrs
-        
-        # Create plot
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
-        
-        # GNN Accuracy plot with error bars
-        ax1.bar(depths, count_means, alpha=0.3, color='blue', label='Number of Graphs')
-        ax1_twin = ax1.twinx()
-        ax1_twin.errorbar(depths, gnn_means * 100, yerr=gnn_ci * 100,
-                         fmt='r-o', label='GNN Accuracy',
-                         capsize=3, capthick=1, elinewidth=1)
-        
-        ax1.set_title(f'GNN Accuracy vs Depth ({set_name} Set)')
-        ax1.set_xlabel('Layer')
-        ax1.set_ylabel('Average Number of Graphs', color='blue')
-        ax1_twin.set_ylabel('Accuracy (%)', color='red')
-        ax1_twin.set_ylim(-5, 105)
-        ax1_twin.grid(True, alpha=0.3)
-        
-        # Add legends
-        lines1, labels1 = ax1.get_legend_handles_labels()
-        lines2, labels2 = ax1_twin.get_legend_handles_labels()
-        ax1_twin.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
-        
-        # KNN Accuracy plot with error bars
-        ax2.bar(depths, count_means, alpha=0.3, color='blue', label='Number of Graphs')
-        ax2_twin = ax2.twinx()
-        ax2_twin.errorbar(depths, knn_means * 100, yerr=knn_ci * 100,
-                         fmt='r-o', label='KNN Accuracy',
-                         capsize=3, capthick=1, elinewidth=1)
-        
-        ax2.set_title(f'KNN Probe Accuracy vs Depth ({set_name} Set)')
-        ax2.set_xlabel('Layer')
-        ax2.set_ylabel('Average Number of Graphs', color='blue')
-        ax2_twin.set_ylabel('Accuracy (%)', color='red')
-        ax2_twin.set_ylim(-5, 105)
-        ax2_twin.grid(True, alpha=0.3)
-        
-        # Add legends
-        lines1, labels1 = ax2.get_legend_handles_labels()
-        lines2, labels2 = ax2_twin.get_legend_handles_labels()
-        ax2_twin.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
-        
-        plt.tight_layout()
-        plt.savefig(save_dir / f'aggregate_accuracy_vs_depth_{set_name}_{timestamp}.png',
-                    bbox_inches='tight', dpi=300)
-        plt.close()
-        
-        # Print statistics
-        print(f"\n{set_name} Set Statistics:")
-        for d in depths:
-            print(f"\nLayer {d}:")
-            print(f"Average number of graphs: {count_means[d]:.1f}")
-            print(f"GNN Accuracy: {gnn_means[d]*100:.1f}% ± {gnn_ci[d]*100:.1f}%")
-            print(f"KNN Accuracy: {knn_means[d]*100:.1f}% ± {knn_ci[d]*100:.1f}%")
+            
+            # Ensure all positions are covered
+            full_gnn_acc = np.zeros(len(positions))
+            full_knn_acc = np.zeros(len(positions))
+            full_counts = np.zeros(len(positions))
+            
+            for depth in range(len(positions)):
+                if depth in gnn_acc.index:
+                    full_gnn_acc[depth] = gnn_acc[depth]
+                    full_knn_acc[depth] = knn_acc[depth]
+                    full_counts[depth] = counts[depth]
+            
+            depth_metrics.append({
+                'gnn_acc': full_gnn_acc,
+                'knn_acc': full_knn_acc,
+                'counts': full_counts
+            })
+        return depth_metrics
     
-    # Create aggregate plots for both train and test sets
-    plot_aggregate_depth_metrics(train_results, 'Train')
-    plot_aggregate_depth_metrics(test_results, 'Test')
+    train_metrics = get_metrics(train_results)
+    test_metrics = get_metrics(test_results)
+    
+    # Calculate statistics
+    def calculate_stats(metrics):
+        n_seeds = len(metrics)
+        gnn_means = np.mean([m['gnn_acc'] for m in metrics], axis=0)
+        knn_means = np.mean([m['knn_acc'] for m in metrics], axis=0)
+        count_means = np.mean([m['counts'] for m in metrics], axis=0)
+        
+        gnn_stderrs = np.std([m['gnn_acc'] for m in metrics], axis=0) / np.sqrt(n_seeds)
+        knn_stderrs = np.std([m['knn_acc'] for m in metrics], axis=0) / np.sqrt(n_seeds)
+        
+        return {
+            'gnn_means': gnn_means,
+            'knn_means': knn_means,
+            'count_means': count_means,
+            'gnn_ci': 1.96 * gnn_stderrs,
+            'knn_ci': 1.96 * knn_stderrs
+        }
+    
+    train_stats = calculate_stats(train_metrics)
+    test_stats = calculate_stats(test_metrics)
+    
+    # Create plots
+    plt.rcParams.update({'font.size': 14})
+    
+    # Plot GNN accuracies (Train and Test)
+    fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+    
+    # GNN Accuracies
+    ax1.bar(positions, train_stats['count_means'], alpha=0.3, color='blue')
+    ax1_twin = ax1.twinx()
+    
+    # Plot both train and test GNN accuracies
+    ax1_twin.errorbar(positions, train_stats['gnn_means'] * 100, 
+                     yerr=train_stats['gnn_ci'] * 100,
+                     fmt='r-o', capsize=3, capthick=1, elinewidth=1, label='Train')
+    ax1_twin.errorbar(positions, test_stats['gnn_means'] * 100, 
+                     yerr=test_stats['gnn_ci'] * 100,
+                     fmt='b-o', capsize=3, capthick=1, elinewidth=1, label='Test')
+    
+    ax1.set_xticks(positions)
+    ax1.set_xticklabels(layer_names, rotation=45, ha='right', fontsize=12)
+    ax1.set_title('GNN Accuracy vs Depth', fontsize=16)
+    ax1.set_xlabel('Layer', fontsize=14)
+    ax1.set_ylabel('Number of Graphs', color='blue', fontsize=14)
+    ax1_twin.set_ylabel('Accuracy (%)', color='black', fontsize=14)
+    ax1_twin.legend()
+    
+    # KNN Accuracies
+    ax2.bar(positions, train_stats['count_means'], alpha=0.3, color='blue')
+    ax2_twin = ax2.twinx()
+    
+    # Plot both train and test KNN accuracies
+    ax2_twin.errorbar(positions, train_stats['knn_means'] * 100,
+                     yerr=train_stats['knn_ci'] * 100,
+                     fmt='r-o', capsize=3, capthick=1, elinewidth=1, label='Train')
+    ax2_twin.errorbar(positions, test_stats['knn_means'] * 100,
+                     yerr=test_stats['knn_ci'] * 100,
+                     fmt='b-o', capsize=3, capthick=1, elinewidth=1, label='Test')
+    
+    ax2.set_xticks(positions)
+    ax2.set_xticklabels(layer_names, rotation=45, ha='right', fontsize=12)
+    ax2.set_title('KNN Probe Accuracy vs Depth', fontsize=16)
+    ax2.set_xlabel('Layer', fontsize=14)
+    ax2.set_ylabel('Number of Graphs', color='blue', fontsize=14)
+    ax2_twin.set_ylabel('Accuracy (%)', color='black', fontsize=14)
+    ax2_twin.legend()
+    
+    plt.tight_layout()
+    plt.savefig(save_dir / f'aggregate_depth_analysis_{timestamp}.png', bbox_inches='tight', dpi=300)
+    plt.close()
 
 def run_multiple_seeds(train_loader, val_loader, test_loader, model_class, optimizer_class, 
                       optimizer_params, num_epochs, dataset_name, num_layers, seeds):
@@ -441,16 +449,20 @@ def run_multiple_seeds(train_loader, val_loader, test_loader, model_class, optim
         'val': {'accuracy': [], 'loss': []},
         'test': {'accuracy': [], 'loss': []}
     }
-    all_depth_distributions = []
     
-    # Store per-seed results
+    test_predictions_by_seed = {}
+    all_depth_distributions = []
     seed_results = []
     
     for seed in seeds:
-        print(f"\nTraining with seed {seed}")
-        set_seed(seed)
+        print(f"\n{'='*50}")
+        print(f"Training with seed {seed}")
+        print(f"{'='*50}")
         
-        model = model_class()
+        set_seed(seed)
+        device = train_loader.dataset[0].x.device
+        model = model_class().to(device)
+        model.reset_parameters()
         optimizer = optimizer_class(model.parameters(), **optimizer_params)
         
         metrics, depth_results = train_and_get_results(
@@ -465,6 +477,35 @@ def run_multiple_seeds(train_loader, val_loader, test_loader, model_class, optim
             seed=seed
         )
         
+        # Store test predictions
+        model.eval()
+        test_preds = []
+        test_true = []
+        with torch.no_grad():
+            for batch in test_loader:
+                batch = batch.to(device)
+                out = model(batch.x, batch.edge_index, batch.batch)
+                pred = out.argmax(dim=1)
+                test_preds.extend(pred.cpu().tolist())
+                test_true.extend(batch.y.cpu().tolist())
+        
+        # test_predictions_by_seed[seed] = {
+        #     'predictions': test_preds,
+        #     'true_labels': test_true
+        # }
+        
+        #print(f"\nTest Set Analysis for seed {seed}:")
+       # print(f"First 10 predictions: {test_preds[:10]}")
+        #print(f"First 10 true labels: {test_true[:10]}")
+        
+        # Compare with previous seeds
+        # if len(test_predictions_by_seed) > 1:
+        #     prev_seed = list(test_predictions_by_seed.keys())[-2]
+        #     prev_preds = test_predictions_by_seed[prev_seed]['predictions']
+        #     curr_preds = test_predictions_by_seed[seed]['predictions']
+        #     num_different = sum(p1 != p2 for p1, p2 in zip(prev_preds, curr_preds))
+        #     print(f"\nNumber of different predictions from previous seed: {num_different}")
+        
         # Store final accuracies for this seed
         seed_result = {
             'seed': seed,
@@ -475,22 +516,24 @@ def run_multiple_seeds(train_loader, val_loader, test_loader, model_class, optim
             'val_loss': metrics['val']['loss'][-1],
             'test_loss': metrics['test']['loss'][-1]
         }
-        seed_results.append(seed_result)
-        
-        # Print final accuracies for this seed
         print(f"\nFinal accuracies for seed {seed}:")
         print(f"Train accuracy: {seed_result['train_acc']*100:.2f}%")
         print(f"Val accuracy:   {seed_result['val_acc']*100:.2f}%")
         print(f"Test accuracy:  {seed_result['test_acc']*100:.2f}%")
         print("-" * 50)
         
+        # Store seed results
+        seed_results.append(seed_result)
+        
         # Store metrics for plotting
         for split in ['train', 'val', 'test']:
             all_metrics[split]['accuracy'].append(metrics[split]['accuracy'])
             all_metrics[split]['loss'].append(metrics[split]['loss'])
         
+        # Store depth results
         for split in ['train', 'test']:
-            all_depth_distributions.append((seed, split, depth_results[split]))
+            if split in depth_results:
+                all_depth_distributions.append((seed, split, depth_results[split]))
     
     # Calculate summary statistics
     train_accs = [result['train_acc'] for result in seed_results]
@@ -511,12 +554,17 @@ def run_multiple_seeds(train_loader, val_loader, test_loader, model_class, optim
     print(f"Final Test Accuracy:  {mean_test*100:.2f}% ± {std_test*100:.2f}%")
     
     # Save results to CSV
-    base_save_dir = Path(f'results/{dataset_name}/aggregate_analysis')
+    base_save_dir = Path(f'results/{dataset_name}/_aggregate_analysis')
     base_save_dir.mkdir(parents=True, exist_ok=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     
     # Save per-seed results
-    seed_df = pd.DataFrame(seed_results)
+    seed_df = pd.DataFrame([{
+        'seed': seed,
+        'train_acc': acc,
+        'val_acc': val_accs[i],
+        'test_acc': test_accs[i]
+    } for i, (seed, acc) in enumerate(zip(seeds, train_accs))])
     seed_df.to_csv(base_save_dir / f'per_seed_results_{timestamp}.csv', index=False)
     
     # Save summary statistics
@@ -530,7 +578,7 @@ def run_multiple_seeds(train_loader, val_loader, test_loader, model_class, optim
     
     # Plot aggregate metrics with vertical error bars
     plot_training_metrics(all_metrics, base_save_dir)
-    create_aggregate_depth_analysis(all_depth_distributions, base_save_dir)
+    create_aggregate_depth_analysis(all_depth_distributions, base_save_dir, model)
     
     return mean_train, std_train, mean_test, std_test
 
