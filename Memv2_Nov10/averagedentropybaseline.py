@@ -31,7 +31,7 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
     os.environ["PYTHONHASHSEED"] = str(seed)
-    print(f"Random seed set as {seed}")
+    #print(f"Random seed set as {seed}")
 
 
 
@@ -39,7 +39,7 @@ def set_seed(seed):
 # Global variable for save directory
 def get_save_dir(dataset_name, num_epochs, num_layers, model_name, seed):
     """Create and return the save directory path with the new naming convention."""
-    save_dir = Path(f'EntropyTracking/{dataset_name}_{num_epochs}epochs_{num_layers}layers_{model_name}_seed{seed}')
+    save_dir = Path(f'NCResults/{dataset_name}/{dataset_name}_{num_epochs}epochs_{num_layers}layers_{model_name}_seed{seed}')
     save_dir.mkdir(parents=True, exist_ok=True)
     return save_dir
 
@@ -519,105 +519,105 @@ def visualize_prediction_depth(depth_df, save_dir, split_idx, mask_name, model):
     summary_table.to_csv(save_dir / f'depth_analysis_summary_{mask_name}_split_{split_idx}_{timestamp}.csv')
 
     # Modified GNN Accuracy vs Delta Entropy visualization
-    plt.figure(figsize=(15, 8))
+    #plt.figure(figsize=(15, 8))
     
     # Create bins with approximately equal number of samples
-    n_bins = 10
+    #n_bins = 10
     # Sort delta entropy values and find bin edges that create equal-sized groups
-    sorted_entropy = np.sort(depth_df['delta_entropy'])
-    bin_edges = np.array_split(sorted_entropy, n_bins)
-    bins = [b[0] for b in bin_edges] + [sorted_entropy[-1]]
+    #sorted_entropy = np.sort(depth_df['delta_entropy'])
+    #bin_edges = np.array_split(sorted_entropy, n_bins)
+    #bins = [b[0] for b in bin_edges] + [sorted_entropy[-1]]
     
     # Create the bins
-    depth_df['entropy_bin'] = pd.cut(depth_df['delta_entropy'], 
-                                    bins=bins,
-                                    labels=range(n_bins))
+    #depth_df['entropy_bin'] = pd.cut(depth_df['delta_entropy'], 
+    #                                bins=bins,
+    #                                labels=range(n_bins))
     
     # Calculate accuracy and sample size for each bin
-    accuracy_by_entropy = depth_df.groupby('entropy_bin').agg({
-        'node_idx': 'count',
-        'gnn_correct': ['mean', 'count']
-    })
+    #accuracy_by_entropy = depth_df.groupby('entropy_bin').agg({
+    #    'node_idx': 'count',
+    #    'gnn_correct': ['mean', 'count']
+   # })
     
     # Flatten column names
-    accuracy_by_entropy.columns = ['num_nodes', 'accuracy', 'count']
+    #accuracy_by_entropy.columns = ['num_nodes', 'accuracy', 'count']
     
     # Create bin labels with sample sizes
-    bin_labels = [f'{bins[i]:.3f}-{bins[i+1]:.3f}\n(n={accuracy_by_entropy.loc[i, "count"]})' 
-                 for i in range(len(bins)-1)]
+    #bin_labels = [f'{bins[i]:.3f}-{bins[i+1]:.3f}\n(n={accuracy_by_entropy.loc[i, "count"]})' 
+     #            for i in range(len(bins)-1)]
     
-    fig, ax1 = plt.subplots(figsize=(15, 6))
-    ax2 = ax1.twinx()
+    #fig, ax1 = plt.subplots(figsize=(15, 6))
+    #ax2 = ax1.twinx()
     
     # Plot bar chart for number of nodes
-    bars = sns.barplot(x=accuracy_by_entropy.index, 
-                      y='num_nodes',
-                      data=accuracy_by_entropy, 
-                      alpha=0.3, 
-                      ax=ax1,
-                      color='blue')
+    #bars = sns.barplot(x=accuracy_by_entropy.index, 
+     #                 y='num_nodes',
+      #                data=accuracy_by_entropy, 
+                    #   alpha=0.3, 
+                    #   ax=ax1,
+                    #   color='blue')
     
     # Plot line for accuracy with error bars
     # Calculate 95% confidence intervals using binomial distribution
-    confidence_intervals = []
-    for idx in accuracy_by_entropy.index:
-        n = accuracy_by_entropy.loc[idx, 'count']
-        p = accuracy_by_entropy.loc[idx, 'accuracy']
-        if n > 0:
-            # Standard error for binomial distribution
-            se = np.sqrt((p * (1-p)) / n)
-            # 95% confidence interval
-            ci = 1.96 * se
-        else:
-            ci = 0
-        confidence_intervals.append(ci)
+    # confidence_intervals = []
+    # for idx in accuracy_by_entropy.index:
+    #     n = accuracy_by_entropy.loc[idx, 'count']
+    #     p = accuracy_by_entropy.loc[idx, 'accuracy']
+    #     if n > 0:
+    #         # Standard error for binomial distribution
+    #         se = np.sqrt((p * (1-p)) / n)
+    #         # 95% confidence interval
+    #         ci = 1.96 * se
+    #     else:
+    #         ci = 0
+    #     confidence_intervals.append(ci)
     
-    # Plot line with error bars
-    line = ax2.errorbar(x=accuracy_by_entropy.index,
-                       y=accuracy_by_entropy['accuracy'],
-                       yerr=confidence_intervals,
-                       color='red',
-                       marker='o',
-                       capsize=5,
-                       capthick=1,
-                       elinewidth=1,
-                       linestyle='-',
-                       linewidth=2,
-                       markersize=8)
+    # # Plot line with error bars
+    # line = ax2.errorbar(x=accuracy_by_entropy.index,
+    #                    y=accuracy_by_entropy['accuracy'],
+    #                    yerr=confidence_intervals,
+    #                    color='red',
+    #                    marker='o',
+    #                    capsize=5,
+    #                    capthick=1,
+    #                    elinewidth=1,
+    #                    linestyle='-',
+    #                    linewidth=2,
+    #                    markersize=8)
     
-    # Customize x-axis labels
-    ax1.set_xticks(range(len(bin_labels)))
-    ax1.set_xticklabels(bin_labels, rotation=45, ha='right')
+    # # Customize x-axis labels
+    # ax1.set_xticks(range(len(bin_labels)))
+    # ax1.set_xticklabels(bin_labels, rotation=45, ha='right')
     
-    ax1.set_xlabel('Delta Entropy Range (sample size)')
-    ax1.set_ylabel('Number of Nodes', color='blue')
-    ax2.set_ylabel('GNN Model Accuracy', color='red')
+    # ax1.set_xlabel('Delta Entropy Range (sample size)')
+    # ax1.set_ylabel('Number of Nodes', color='blue')
+    # ax2.set_ylabel('GNN Model Accuracy', color='red')
     
-    # Set y-axis limits for accuracy between 0 and 1
-    ax2.set_ylim(-0.05, 1.05)
+    # # Set y-axis limits for accuracy between 0 and 1
+    # ax2.set_ylim(-0.05, 1.05)
     
-    plt.title(f'GNN Model Accuracy vs Delta Entropy ({mask_name} Set)\nwith 95% Confidence Intervals')
+    # plt.title(f'GNN Model Accuracy vs Delta Entropy ({mask_name} Set)\nwith 95% Confidence Intervals')
     
-    # Add grid for easier reading
-    ax2.grid(True, alpha=0.3)
+    # # Add grid for easier reading
+    # ax2.grid(True, alpha=0.3)
     
-    # Add legend
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend([(bars.patches[0]), (line)], 
-              ['Node Count', 'Accuracy'],
-              loc='upper right')
+    # # Add legend
+    # lines1, labels1 = ax1.get_legend_handles_labels()
+    # lines2, labels2 = ax2.get_legend_handles_labels()
+    # ax1.legend([(bars.patches[0]), (line)], 
+    #           ['Node Count', 'Accuracy'],
+    #           loc='upper right')
     
-    plt.tight_layout()
-    plt.savefig(save_dir / f'gnn_accuracy_vs_entropy_{mask_name}_split_{split_idx}_{timestamp}.png',
-                bbox_inches='tight', dpi=300)
-    plt.close()
+    # plt.tight_layout()
+    # plt.savefig(save_dir / f'gnn_accuracy_vs_entropy_{mask_name}_split_{split_idx}_{timestamp}.png',
+    #             bbox_inches='tight', dpi=300)
+    # plt.close()
 
-    # Save the binned analysis to CSV with proper precision
-    accuracy_by_entropy['entropy_range'] = bin_labels
-    accuracy_by_entropy.to_csv(save_dir / f'gnn_accuracy_vs_entropy_{mask_name}_split_{split_idx}_{timestamp}.csv')
+    # # Save the binned analysis to CSV with proper precision
+    # accuracy_by_entropy['entropy_range'] = bin_labels
+    # accuracy_by_entropy.to_csv(save_dir / f'gnn_accuracy_vs_entropy_{mask_name}_split_{split_idx}_{timestamp}.csv')
 
-    return accuracy_by_entropy
+    # return accuracy_by_entropy
 
 def train_and_get_results(data, model, optimizer, num_epochs, dataset_name, num_layers, seed, noise_level=1.0):
     """
@@ -824,11 +824,11 @@ def plot_training_metrics(losses, accuracies, val_losses, val_accuracies, test_l
     ax1.plot(epochs, losses, 'b-', label='Training')
     ax1.plot(epochs, val_losses, 'g-', label='Validation')
     ax1.plot(epochs, test_losses, 'r-', label='Test')
-    ax1.set_title(f'Loss vs Epochs (Split {split_idx})')
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss')
-    ax1.grid(True)
-    ax1.legend()
+    ax1.set_title(f'Loss vs Epochs (Split {split_idx})', fontsize=20)
+    ax1.set_xlabel('Epoch', fontsize=20)
+    ax1.set_ylabel('Loss', fontsize=20)
+    ax1.tick_params(labelsize=20)
+    ax1.legend(fontsize=20)
     
     # Set integer x-axis for epochs
     ax1.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
@@ -837,11 +837,11 @@ def plot_training_metrics(losses, accuracies, val_losses, val_accuracies, test_l
     ax2.plot(epochs, accuracies, 'b-', label='Training')
     ax2.plot(epochs, val_accuracies, 'g-', label='Validation')
     ax2.plot(epochs, test_accuracies, 'r-', label='Test')
-    ax2.set_title(f'Accuracy vs Epochs (Split {split_idx})')
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Accuracy (%)')
-    ax2.grid(True)
-    ax2.legend()
+    ax2.set_title(f'Accuracy vs Epochs (Split {split_idx})', fontsize=20)
+    ax2.set_xlabel('Epoch', fontsize=20)
+    ax2.set_ylabel('Accuracy (%)', fontsize=20)
+    ax2.tick_params(labelsize=20)
+    ax2.legend(fontsize=20)
     
     # Set integer x-axis for epochs and appropriate y-axis for percentages
     ax2.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
@@ -874,7 +874,7 @@ def plot_training_metrics(losses, accuracies, val_losses, val_accuracies, test_l
 def aggregate_results_across_seeds(base_save_dir, dataset_name, num_epochs, num_layers, model_name, seeds):
     """Aggregate results from multiple seeds and create summary visualizations."""
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    aggregate_dir = Path(f'{base_save_dir}/aggregate_results_{timestamp}')
+    aggregate_dir = Path(f'NCResults/{dataset_name}/aggregate_results_{dataset_name}_{timestamp}')
     aggregate_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize dictionaries to store metrics across seeds
@@ -889,7 +889,7 @@ def aggregate_results_across_seeds(base_save_dir, dataset_name, num_epochs, num_
 
     # Collect data from each seed
     for seed in seeds:
-        seed_dir = Path(f'EntropyTracking/{dataset_name}_{num_epochs}epochs_{num_layers}layers_{model_name}_seed{seed}')
+        seed_dir = Path(f'NCResults/{dataset_name}/{dataset_name}_{num_epochs}epochs_{num_layers}layers_{model_name}_seed{seed}')
         
         try:
             # Load training metrics
@@ -954,11 +954,11 @@ def create_aggregate_training_plot(all_metrics, save_dir):
         ax1.fill_between(epochs, mean_loss - ci_loss, mean_loss + ci_loss, 
                         color=colors[metric_type], alpha=0.2)
     
-    ax1.set_title('Loss vs Epochs (with 95% CI)')
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss')
-    ax1.grid(True)
-    ax1.legend()
+    ax1.set_title('Loss vs Epochs', fontsize=20)
+    ax1.set_xlabel('Epoch', fontsize=20)
+    ax1.set_ylabel('Loss', fontsize=20)
+    ax1.tick_params(labelsize=20)
+    ax1.legend(fontsize=20)
     
     # Plot accuracies
     for metric_type in ['train', 'val', 'test']:
@@ -971,11 +971,11 @@ def create_aggregate_training_plot(all_metrics, save_dir):
         ax2.fill_between(epochs, mean_acc - ci_acc, mean_acc + ci_acc,
                         color=colors[metric_type], alpha=0.2)
     
-    ax2.set_title('Accuracy vs Epochs (with 95% CI)')
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Accuracy (%)')
-    ax2.grid(True)
-    ax2.legend()
+    ax2.set_title('Accuracy vs Epochs', fontsize=20)
+    ax2.set_xlabel('Epoch', fontsize=20)
+    ax2.set_ylabel('Accuracy (%)', fontsize=20)
+    ax2.tick_params(labelsize=20)
+    ax2.legend(fontsize=20)
     ax2.set_ylim(-5, 105)
     
     plt.tight_layout()
@@ -1004,10 +1004,10 @@ def create_aggregate_depth_distribution(all_depth_distributions, save_dir):
         ci_percentages = 1.96 * np.std(depth_percentages, axis=0) / np.sqrt(len(depth_data))
         
         ax.bar(all_depths, mean_percentages, yerr=ci_percentages, capsize=5)
-        ax.set_title(f'Prediction Depth Distribution ({set_type.capitalize()} Set)')
-        ax.set_xlabel('Layer')
-        ax.set_ylabel('Percentage of Nodes')
-        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Prediction Depth Distribution ({set_type.capitalize()} Set)', fontsize=20)
+        ax.set_xlabel('Layer', fontsize=20)
+        ax.set_ylabel('Percentage of Nodes', fontsize=20)
+        ax.tick_params(labelsize=20)
     
     plt.tight_layout()
     plt.savefig(save_dir / 'aggregate_depth_distribution.png', bbox_inches='tight', dpi=300)
@@ -1055,11 +1055,14 @@ def create_aggregate_entropy_accuracy_plot(all_entropy_accuracies, save_dir):
         # Set labels and title
         ax.set_xticks(range(len(mean_acc)))
         ax.set_xticklabels(x_labels, rotation=45, ha='right')
-        ax.set_xlabel('Delta Entropy Range (average sample size)')
-        ax.set_ylabel('Number of Nodes', color='blue')
-        ax2.set_ylabel('Accuracy', color='red')
-        ax2.set_ylim(-0.05, 1.05)
-        ax.set_title(f'Accuracy vs Delta Entropy ({set_type.capitalize()} Set)')
+        ax.set_xlabel('Delta Entropy Range (average sample size)', fontsize=20)
+        ax.set_ylabel('Number of Nodes', color='blue', fontsize=20)
+        ax2.set_ylabel('Accuracy', color='red', fontsize=20)
+        ax.set_title(f'Accuracy vs Delta Entropy ({set_type.capitalize()} Set)', fontsize=20)
+        ax.tick_params(labelsize=20)
+        ax2.tick_params(labelsize=20)
+        ax.legend(fontsize=20)
+        ax2.legend(fontsize=20)
         
         # Add grid for easier reading
         ax2.grid(True, alpha=0.3)
@@ -1082,10 +1085,12 @@ def create_aggregate_entropy_accuracy_plot(all_entropy_accuracies, save_dir):
     summary_df.to_csv(save_dir / 'aggregate_entropy_accuracy_summary.csv', index=False)
 
 def create_aggregate_accuracy_depth_plots(all_depth_distributions, save_dir):
-    """Create aggregate accuracy vs depth plots for both GNN and KNN."""
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 16))
+    """Create separate aggregate accuracy vs depth plots for GNN and KNN."""
+    # Create separate figures for GNN and KNN
+    fig_gnn, (ax1_gnn, ax2_gnn) = plt.subplots(1, 2, figsize=(20, 8))
+    fig_knn, (ax1_knn, ax2_knn) = plt.subplots(1, 2, figsize=(20, 8))
     
-    for set_type, (ax_acc, ax_knn) in zip(['train', 'test'], [(ax1, ax3), (ax2, ax4)]):
+    for set_type, (ax_gnn, ax_knn) in zip(['train', 'test'], [(ax1_gnn, ax1_knn), (ax2_gnn, ax2_knn)]):
         # Get depth data for current set type
         depth_dfs = [df for seed, st, df in all_depth_distributions if st == set_type]
         
@@ -1125,18 +1130,18 @@ def create_aggregate_accuracy_depth_plots(all_depth_distributions, save_dir):
         count_mean = np.mean(node_counts, axis=1)
         
         # Plot GNN accuracy
-        ax_acc.bar(range(len(count_mean)), count_mean, alpha=0.3, color='blue')
-        ax_acc2 = ax_acc.twinx()
-        ax_acc2.errorbar(range(len(gnn_mean)), gnn_mean, yerr=gnn_ci,
+        ax_gnn.bar(range(len(count_mean)), count_mean, alpha=0.3, color='blue')
+        ax_gnn2 = ax_gnn.twinx()
+        ax_gnn2.errorbar(range(len(gnn_mean)), gnn_mean, yerr=gnn_ci,
                         color='red', marker='o', capsize=5, capthick=1,
                         elinewidth=1, linestyle='-', linewidth=2, markersize=8)
         
-        ax_acc.set_title(f'GNN Accuracy vs Depth ({set_type.capitalize()} Set)')
-        ax_acc.set_xlabel('Layer')
-        ax_acc.set_ylabel('Number of Nodes', color='blue')
-        ax_acc2.set_ylabel('GNN Accuracy', color='red')
-        ax_acc2.set_ylim(-0.05, 1.05)
-        ax_acc2.grid(True, alpha=0.3)
+        ax_gnn.set_title(f'GNN Accuracy vs Depth ({set_type.capitalize()} Set)', fontsize=20)
+        ax_gnn.set_xlabel('Layer', fontsize=20)
+        ax_gnn.set_ylabel('Number of Nodes', color='blue', fontsize=20)
+        ax_gnn2.set_ylabel('GNN Accuracy', color='red', fontsize=20)
+        ax_gnn2.set_ylim(-0.05, 1.05)
+        ax_gnn2.grid(True, alpha=0.3)
         
         # Plot KNN accuracy
         ax_knn.bar(range(len(count_mean)), count_mean, alpha=0.3, color='blue')
@@ -1145,22 +1150,32 @@ def create_aggregate_accuracy_depth_plots(all_depth_distributions, save_dir):
                         color='red', marker='o', capsize=5, capthick=1,
                         elinewidth=1, linestyle='-', linewidth=2, markersize=8)
         
-        ax_knn.set_title(f'KNN Probe Accuracy vs Depth ({set_type.capitalize()} Set)')
-        ax_knn.set_xlabel('Layer')
-        ax_knn.set_ylabel('Number of Nodes', color='blue')
-        ax_knn2.set_ylabel('KNN Accuracy', color='red')
+        ax_knn.set_title(f'KNN Probe Accuracy vs Depth ({set_type.capitalize()} Set)', fontsize=20)
+        ax_knn.set_xlabel('Layer', fontsize=20)
+        ax_knn.set_ylabel('Number of Nodes', color='blue', fontsize=20)
+        ax_knn2.set_ylabel('KNN Accuracy', color='red', fontsize=20)
         ax_knn2.set_ylim(-0.05, 1.05)
         ax_knn2.grid(True, alpha=0.3)
         
         # Add legends
-        for ax in [ax_acc, ax_knn]:
-            ax.legend(['Node Count'], loc='upper left')
-        for ax in [ax_acc2, ax_knn2]:
-            ax.legend(['Accuracy'], loc='upper right')
+        ax_gnn.legend(['Node Count'], loc='upper left')
+        ax_gnn2.legend(['Accuracy'], loc='upper right')
+        ax_knn.legend(['Node Count'], loc='upper left')
+        ax_knn2.legend(['Accuracy'], loc='upper right')
     
+    # Save separate figures
+    fig_gnn.suptitle('GNN Accuracy vs Depth (Train and Test)', fontsize=22, y=1.05)
+    fig_knn.suptitle('KNN Probe Accuracy vs Depth (Train and Test)', fontsize=22, y=1.05)
+    
+    plt.figure(fig_gnn.number)
     plt.tight_layout()
-    plt.savefig(save_dir / 'aggregate_accuracy_depth.png', bbox_inches='tight', dpi=300)
-    plt.close()
+    plt.savefig(save_dir / 'aggregate_gnn_accuracy_depth.png', bbox_inches='tight', dpi=300)
+    
+    plt.figure(fig_knn.number)
+    plt.tight_layout()
+    plt.savefig(save_dir / 'aggregate_knn_accuracy_depth.png', bbox_inches='tight', dpi=300)
+    
+    plt.close('all')
 
 def create_aggregate_early_late_learners(all_depth_distributions, save_dir):
     """Create aggregate analysis of early vs late learners."""
@@ -1205,14 +1220,16 @@ def create_aggregate_early_late_learners(all_depth_distributions, save_dir):
         
         ax.set_xticks([1, 2])
         ax.set_xticklabels(['Early Learners\n(Depth ≤ 1)', 'Late Learners\n(Depth ≥ 2)'])
-        ax.set_title(f'Entropy Distribution: Early vs Late Learners ({set_type.capitalize()} Set)')
-        ax.set_ylabel('Delta Entropy')
+        ax.set_title(f'Entropy Distribution: Early vs Late Learners ({set_type.capitalize()} Set)', fontsize=20)
+        ax.set_xlabel('Learner Type', fontsize=20)
+        ax.set_ylabel('Delta Entropy', fontsize=20)
+        ax.tick_params(labelsize=20)
         
-        # Add mean values as text
+        # Modify text annotations
         ax.text(1, ax.get_ylim()[1], f'Mean: {early_mean:.3f}±{early_ci:.3f}',
-                horizontalalignment='center', verticalalignment='bottom')
+                horizontalalignment='center', verticalalignment='bottom', fontsize=20)
         ax.text(2, ax.get_ylim()[1], f'Mean: {late_mean:.3f}±{late_ci:.3f}',
-                horizontalalignment='center', verticalalignment='bottom')
+                horizontalalignment='center', verticalalignment='bottom', fontsize=20)
     
     plt.tight_layout()
     plt.savefig(save_dir / 'aggregate_early_late_learners.png', bbox_inches='tight', dpi=300)
@@ -1281,6 +1298,18 @@ def run_multiple_seeds(data, model_class, optimizer_class, optimizer_params, num
         )
         all_results.append(results)
     
+    # Calculate and print average accuracies across all seeds
+    avg_test_acc = np.mean([res[0][0] for res in all_results])
+    avg_train_acc = np.mean([res[2][0] for res in all_results])
+    test_std = np.std([res[0][0] for res in all_results])
+    train_std = np.std([res[2][0] for res in all_results])
+    
+    print("\n" + "="*50)
+    print(f"Final Results Averaged Over {len(seeds)} Seeds:")
+    print(f"Average Train Accuracy: {avg_train_acc:.2f}% ± {train_std:.2f}%")
+    print(f"Average Test Accuracy: {avg_test_acc:.2f}% ± {test_std:.2f}%")
+    print("="*50 + "\n")
+    
     # Aggregate results
     aggregate_results_across_seeds(
         base_save_dir='EntropyTracking',
@@ -1292,7 +1321,6 @@ def run_multiple_seeds(data, model_class, optimizer_class, optimizer_params, num
     )
     
     return all_results
-
 
 
 
