@@ -1,11 +1,9 @@
-# I need to call this file from the main.py file to train the model and get the results
 import os
 import random
 import time
 import numpy as np
 import torch
 from tqdm import tqdm
-#import methods
 import copy
 import matplotlib.pyplot as plt
 import seaborn as sns
